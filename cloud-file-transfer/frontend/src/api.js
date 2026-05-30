@@ -1,0 +1,60 @@
+const API_BASE_URL = "http://localhost:5000";
+
+export async function uploadFile(file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE_URL}/api/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to upload file.");
+  }
+
+  return data;
+}
+
+export async function getFiles() {
+  const response = await fetch(`${API_BASE_URL}/api/files`);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to fetch files.");
+  }
+
+  return data;
+}
+
+export async function getDownloadUrl(fileName) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/download/${encodeURIComponent(fileName)}`
+  );
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to generate download URL.");
+  }
+
+  return data;
+}
+
+export async function deleteFile(fileName) {
+  const response = await fetch(
+    `${API_BASE_URL}/api/delete/${encodeURIComponent(fileName)}`,
+    {
+      method: "DELETE",
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || "Failed to delete file.");
+  }
+
+  return data;
+}
