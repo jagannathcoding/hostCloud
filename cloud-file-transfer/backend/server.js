@@ -2,22 +2,21 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const dotenv = require("dotenv");
-const { Storage } = require("@google-cloud/storage");
+const cloudinary = require("cloudinary").v2;
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const bucketName = process.env.GCS_BUCKET_NAME;
 
 app.use(cors());
 app.use(express.json());
 
-const storage = new Storage({
-  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS || "./service-account.json",
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-
-const bucket = storage.bucket(bucketName);
 
 const uploadedFiles = [];
 
@@ -28,12 +27,14 @@ const upload = multer({
   },
 });
 
-function formatFileDetails(file, cloudFileName) {
+function formatFileDetails(file, uploadResult) {
   return {
     originalName: file.originalname,
-    fileName: cloudFileName,
+    fileName: uploadResult.public_id,
     size: file.size,
     mimeType: file.mimetype,
+    downloadUrl: uploadResult.secure_url,
+    resourceType: uploadResult.resource_type,
     uploadDate: new Date().toISOString(),
   };
 }
@@ -49,8 +50,8 @@ app.get("/", (req, res) => {
 
 app.post("/api/upload", upload.single("file"), async (req, res) => {
   try {
-    if (!bucketName) {
-      return res.status(500).json({ message: "GCS_BUCKET_NAME is missing in .env file." });
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ message: "Cloudinary credentials are missing in .env file." });
     }
 
     if (!req.file) {
@@ -58,15 +59,26 @@ app.post("/api/upload", upload.single("file"), async (req, res) => {
     }
 
     const cloudFileName = getSafeFileName(req.file.originalname);
-    const gcsFile = bucket.file(cloudFileName);
+    const uploadResult = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: "auto",
+          public_id: cloudFileName,
+          folder: process.env.CLOUDINARY_FOLDER || undefined,
+        },
+        (error, result) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve(result);
+        }
+      );
 
-    await gcsFile.save(req.file.buffer, {
-      metadata: {
-        contentType: req.file.mimetype,
-      },
+      uploadStream.end(req.file.buffer);
     });
 
-    const fileDetails = formatFileDetails(req.file, cloudFileName);
+    const fileDetails = formatFileDetails(req.file, uploadResult);
     uploadedFiles.unshift(fileDetails);
 
     res.status(201).json({
@@ -87,28 +99,16 @@ app.get("/api/files", (req, res) => {
 
 app.get("/api/download/:fileName", async (req, res) => {
   try {
-    if (!bucketName) {
-      return res.status(500).json({ message: "GCS_BUCKET_NAME is missing in .env file." });
-    }
-
     const fileName = req.params.fileName;
-    const gcsFile = bucket.file(fileName);
+    const fileDetails = uploadedFiles.find((file) => file.fileName === fileName);
 
-    const [exists] = await gcsFile.exists();
-
-    if (!exists) {
-      return res.status(404).json({ message: "File not found in cloud storage." });
+    if (!fileDetails) {
+      return res.status(404).json({ message: "File not found." });
     }
-
-    const [signedUrl] = await gcsFile.getSignedUrl({
-      version: "v4",
-      action: "read",
-      expires: Date.now() + 15 * 60 * 1000,
-    });
 
     res.json({
-      message: "Signed URL generated successfully.",
-      downloadUrl: signedUrl,
+      message: "Download URL generated successfully.",
+      downloadUrl: fileDetails.downloadUrl,
     });
   } catch (error) {
     res.status(500).json({
@@ -120,26 +120,22 @@ app.get("/api/download/:fileName", async (req, res) => {
 
 app.delete("/api/delete/:fileName", async (req, res) => {
   try {
-    if (!bucketName) {
-      return res.status(500).json({ message: "GCS_BUCKET_NAME is missing in .env file." });
-    }
-
     const fileName = req.params.fileName;
-    const gcsFile = bucket.file(fileName);
-
-    const [exists] = await gcsFile.exists();
-
-    if (!exists) {
-      return res.status(404).json({ message: "File not found in cloud storage." });
-    }
-
-    await gcsFile.delete();
-
     const fileIndex = uploadedFiles.findIndex((file) => file.fileName === fileName);
 
-    if (fileIndex !== -1) {
-      uploadedFiles.splice(fileIndex, 1);
+    if (fileIndex === -1) {
+      return res.status(404).json({ message: "File not found." });
     }
+
+    const fileDetails = uploadedFiles[fileIndex];
+    const deleteResult = await cloudinary.uploader.destroy(fileDetails.fileName, {
+      resource_type: fileDetails.resourceType || "raw",
+    });
+
+    if (deleteResult.result !== "ok" && deleteResult.result !== "not found") {
+      return res.status(500).json({ message: "Failed to delete file from Cloudinary." });
+    }
+    uploadedFiles.splice(fileIndex, 1);
 
     res.json({ message: "File deleted successfully." });
   } catch (error) {
