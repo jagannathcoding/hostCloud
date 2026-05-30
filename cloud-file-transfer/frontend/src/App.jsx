@@ -71,9 +71,9 @@ function App() {
     }
   }
 
-  async function handleDownload(fileName) {
+  async function handleDownload(fileName, resourceType, originalName) {
     try {
-      const result = await getDownloadUrl(fileName);
+      const result = await getDownloadUrl(fileName, resourceType, originalName);
       window.open(result.downloadUrl, "_blank");
       showMessage("Download link created successfully.", "success");
     } catch (error) {
@@ -81,9 +81,9 @@ function App() {
     }
   }
 
-  async function handleDelete(fileName) {
+  async function handleDelete(fileName, resourceType) {
     try {
-      const result = await deleteFile(fileName);
+      const result = await deleteFile(fileName, resourceType);
       showMessage(result.message, "success");
       setUploadedFiles((currentFiles) =>
         currentFiles.filter((file) => file.fileName !== fileName)
@@ -187,13 +187,15 @@ function App() {
 
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                     <button
-                      onClick={() => handleDownload(file.fileName)}
+                      onClick={() =>
+                        handleDownload(file.fileName, file.resourceType, file.originalName)
+                      }
                       className="flex-1 rounded-xl bg-green-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
                     >
                       Download
                     </button>
                     <button
-                      onClick={() => handleDelete(file.fileName)}
+                      onClick={() => handleDelete(file.fileName, file.resourceType)}
                       className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
                     >
                       Delete

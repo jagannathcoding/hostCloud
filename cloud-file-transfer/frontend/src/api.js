@@ -29,9 +29,18 @@ export async function getFiles() {
   return data;
 }
 
-export async function getDownloadUrl(fileName) {
+export async function getDownloadUrl(fileName, resourceType, originalName) {
+  const params = new URLSearchParams();
+  if (resourceType) {
+    params.set("resourceType", resourceType);
+  }
+  if (originalName) {
+    params.set("downloadName", originalName);
+  }
+
+  const query = params.toString() ? `?${params.toString()}` : "";
   const response = await fetch(
-    `${API_BASE_URL}/api/download/${encodeURIComponent(fileName)}`
+    `${API_BASE_URL}/api/download/${encodeURIComponent(fileName)}${query}`
   );
   const data = await response.json();
 
@@ -42,9 +51,12 @@ export async function getDownloadUrl(fileName) {
   return data;
 }
 
-export async function deleteFile(fileName) {
+export async function deleteFile(fileName, resourceType) {
+  const query = resourceType
+    ? `?resourceType=${encodeURIComponent(resourceType)}`
+    : "";
   const response = await fetch(
-    `${API_BASE_URL}/api/delete/${encodeURIComponent(fileName)}`,
+    `${API_BASE_URL}/api/delete/${encodeURIComponent(fileName)}${query}`,
     {
       method: "DELETE",
     }
