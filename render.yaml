@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: hostcloud-app
+    env: node
+    rootDir: cloud-file-transfer
+    buildCommand: cd backend && npm install && cd ../frontend && npm install && npm run build
+    startCommand: node backend/server.js
+    plan: free
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        sync: false

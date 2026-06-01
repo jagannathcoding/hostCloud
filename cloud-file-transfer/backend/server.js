@@ -9,6 +9,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const FRONTEND_DIST_PATH = path.join(__dirname, "..", "frontend", "dist");
 
 app.use(cors());
 app.use(express.json());
@@ -144,10 +145,6 @@ async function getCloudinaryResourceByTypes(publicId, resourceTypes) {
 
   return null;
 }
-
-app.get("/", (req, res) => {
-  res.send("Cloud File Transfer Backend Running");
-});
 
 app.post("/api/upload", upload.single("file"), async (req, res) => {
   try {
@@ -307,6 +304,12 @@ app.use((error, req, res, next) => {
   }
 
   next(error);
+});
+
+app.use(express.static(FRONTEND_DIST_PATH));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(FRONTEND_DIST_PATH, "index.html"));
 });
 
 app.listen(PORT, () => {
