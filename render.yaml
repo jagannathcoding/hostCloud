@@ -3,7 +3,7 @@ services:
     name: hostcloud-app
     env: node
     rootDir: cloud-file-transfer
-    buildCommand: cd backend && npm install && cd ../frontend && npm install && npm run build
+    buildCommand: cd backend && rm -rf node_modules && npm ci && cd ../frontend && rm -rf node_modules && npm ci && npm run build
     startCommand: node backend/server.js
     plan: free
     envVars:
